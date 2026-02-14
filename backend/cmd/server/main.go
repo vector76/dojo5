@@ -13,7 +13,7 @@ import (
 	"dojo-crm/backend/internal/models"
 )
 
-func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, classTypeHandler *handlers.ClassTypeHandler) *http.ServeMux {
+func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, classTypeHandler *handlers.ClassTypeHandler, classHandler *handlers.ClassHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
@@ -36,6 +36,13 @@ func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *ha
 	mux.Handle("POST /api/class-types", chain(classTypeHandler.Create, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 	mux.Handle("PUT /api/class-types/{id}", chain(classTypeHandler.Update, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 	mux.Handle("DELETE /api/class-types/{id}", chain(classTypeHandler.Delete, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+
+	// Class endpoints
+	mux.Handle("GET /api/classes", chain(classHandler.List, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
+	mux.Handle("GET /api/classes/{id}", chain(classHandler.Get, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
+	mux.Handle("POST /api/classes", chain(classHandler.Create, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+	mux.Handle("PUT /api/classes/{id}", chain(classHandler.Update, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+	mux.Handle("DELETE /api/classes/{id}", chain(classHandler.Delete, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 
 	return mux
 }
@@ -93,12 +100,14 @@ func main() {
 
 	userRepo := models.NewUserRepo(db)
 	classTypeRepo := models.NewClassTypeRepo(db)
+	classRepo := models.NewClassRepo(db)
 	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
 	userHandler := handlers.NewUserHandler(userRepo)
 	classTypeHandler := handlers.NewClassTypeHandler(classTypeRepo)
+	classHandler := handlers.NewClassHandler(classRepo)
 
 	fmt.Printf("Starting server on %s\n", addr)
-	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler, classTypeHandler)); err != nil {
+	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler, classTypeHandler, classHandler)); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)
 	}

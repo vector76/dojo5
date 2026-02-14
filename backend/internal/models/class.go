@@ -56,6 +56,8 @@ func (r *ClassRepo) GetByID(id int64) (*Class, error) {
 type ClassFilter struct {
 	ClassTypeID  *int64
 	InstructorID *int64
+	From         *time.Time
+	To           *time.Time
 }
 
 func (r *ClassRepo) List(filter ClassFilter) ([]Class, error) {
@@ -70,6 +72,14 @@ func (r *ClassRepo) List(filter ClassFilter) ([]Class, error) {
 	if filter.InstructorID != nil {
 		query += ` AND instructor_id = ?`
 		args = append(args, *filter.InstructorID)
+	}
+	if filter.From != nil {
+		query += ` AND start_time >= ?`
+		args = append(args, *filter.From)
+	}
+	if filter.To != nil {
+		query += ` AND start_time < ?`
+		args = append(args, *filter.To)
 	}
 
 	query += ` ORDER BY start_time`
