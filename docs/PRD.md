@@ -38,25 +38,27 @@ A lightweight CRM system for managing a small martial arts dojo or yoga studio, 
 | Record attendance | Yes | Yes | No |
 | View own attendance | Yes | Yes | Yes |
 | Record payments | Yes | No | No |
-| View own payments | Yes | No | Yes |
+| View own payments | Yes | No* | Yes |
 | View all members | Yes | Yes | No |
 | Edit own profile | Yes | Yes | Yes |
 
+*Instructors are staff, not students — they don't have membership dues or payment records. Payment tracking applies to users (students/prospective members) only.
+
 ### 2. Member Management
-- Add/edit/delete members
+- Add/edit/soft-delete members (deletion preserves attendance and payment history)
 - **Required fields**: name, email (unique), phone
 - **Optional fields**: emergency contact, join date, membership status
 - Track membership type (monthly, annual, drop-in)
 
 ### 3. Class/Session Management
 - Define class types (e.g., "Beginner Yoga", "Advanced Karate") - admin only
-- Schedule classes with instructor, time, capacity - admin only
+- Schedule classes with instructor, time, duration, capacity - admin only
 - Track attendance (which members attended which class) - admin or instructor
 
 ### 4. Basic Payments/Dues Tracking
 - Record payments received - admin only
 - View payment history per member
-- Simple outstanding balance indicator
+- Simple outstanding balance indicator: admin manually sets each member's expected balance (no automated dues schedule); payments reduce it; balance endpoint shows the difference
 
 ## Confirmed Assumptions
 
