@@ -114,6 +114,15 @@ func (r *UserRepo) Count() (int64, error) {
 	return count, nil
 }
 
+func (r *UserRepo) CountByRole(role string) (int64, error) {
+	var count int64
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role = ? AND deleted_at IS NULL`, role).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting users by role: %w", err)
+	}
+	return count, nil
+}
+
 func (r *UserRepo) scanUser(row *sql.Row) (*User, error) {
 	var u User
 	err := row.Scan(

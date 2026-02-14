@@ -27,6 +27,8 @@ func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *ha
 	mux.Handle("GET /api/users/{id}", chain(userHandler.Get, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
 	mux.Handle("PUT /api/users/{id}", chain(userHandler.Update, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
 	mux.Handle("DELETE /api/users/{id}", chain(userHandler.Delete, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+	mux.Handle("PUT /api/users/{id}/role", chain(userHandler.ChangeRole, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+	mux.Handle("PUT /api/users/{id}/password", chain(userHandler.ResetPassword, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 
 	return mux
 }

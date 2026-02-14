@@ -441,6 +441,331 @@ func TestUserHandler_Delete(t *testing.T) {
 	})
 }
 
+func TestUserHandler_ChangeRole(t *testing.T) {
+	t.Run("admin changes user role", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "role-admin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "role-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{"role": "instructor"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/role", body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var resp userResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if resp.Role != "instructor" {
+			t.Errorf("expected role 'instructor', got %q", resp.Role)
+		}
+	})
+
+	t.Run("promote user to admin", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "promo-admin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "promo-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{"role": "admin"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/role", body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var resp userResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if resp.Role != "admin" {
+			t.Errorf("expected role 'admin', got %q", resp.Role)
+		}
+	})
+
+	t.Run("cannot demote last admin", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "lastadmin@example.com", "password", "admin")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{"role": "user"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(admin.ID)+"/role", body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(admin.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Errorf("expected 409, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("can demote admin when others exist", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin1 := createTestUser(t, repo, "admin1@example.com", "password", "admin")
+		admin2 := createTestUser(t, repo, "admin2@example.com", "password", "admin")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{"role": "instructor"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(admin2.ID)+"/role", body, admin1.ID, "admin")
+		req.SetPathValue("id", itoa(admin2.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("invalid role", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "inv-admin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "inv-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{"role": "superadmin"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/role", body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("missing role", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "miss-admin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "miss-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/role", body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("nonexistent user", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "ne-admin@example.com", "password", "admin")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{"role": "user"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/9999/role", body, admin.ID, "admin")
+		req.SetPathValue("id", "9999")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("instructor cannot change role", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		createTestUser(t, repo, "inst-cr@example.com", "password", "instructor")
+		target := createTestUser(t, repo, "inst-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ChangeRole, "admin")
+
+		body, _ := json.Marshal(map[string]string{"role": "admin"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/role", body, 1, "instructor")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("unauthenticated", func(t *testing.T) {
+		wrapped := wrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+			// should not reach here
+		}, "admin")
+
+		req := httptest.NewRequest(http.MethodPut, "/api/users/1/role", nil)
+		req.SetPathValue("id", "1")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", rec.Code)
+		}
+	})
+}
+
+func TestUserHandler_ResetPassword(t *testing.T) {
+	t.Run("admin resets password", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "rp-admin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "rp-target@example.com", "oldpass", "user")
+
+		wrapped := wrapWithMiddleware(handler.ResetPassword, "admin")
+
+		body, _ := json.Marshal(map[string]string{"password": "newpass123"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/password", body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify new password works
+		updated, _ := repo.GetByEmail("rp-target@example.com")
+		if err := auth.CheckPassword(updated.PasswordHash, "newpass123"); err != nil {
+			t.Error("new password should be valid")
+		}
+		// Verify old password no longer works
+		if err := auth.CheckPassword(updated.PasswordHash, "oldpass"); err == nil {
+			t.Error("old password should not work")
+		}
+	})
+
+	t.Run("missing password", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "mp-admin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "mp-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ResetPassword, "admin")
+
+		body, _ := json.Marshal(map[string]string{})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/password", body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("nonexistent user", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "ne-rp-admin@example.com", "password", "admin")
+
+		wrapped := wrapWithMiddleware(handler.ResetPassword, "admin")
+
+		body, _ := json.Marshal(map[string]string{"password": "newpass"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/9999/password", body, admin.ID, "admin")
+		req.SetPathValue("id", "9999")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("instructor cannot reset password", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		createTestUser(t, repo, "inst-rp@example.com", "password", "instructor")
+		target := createTestUser(t, repo, "inst-rp-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ResetPassword, "admin")
+
+		body, _ := json.Marshal(map[string]string{"password": "newpass"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID)+"/password", body, 1, "instructor")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("regular user cannot reset password", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		user := createTestUser(t, repo, "user-rp@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.ResetPassword, "admin")
+
+		body, _ := json.Marshal(map[string]string{"password": "newpass"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(user.ID)+"/password", body, user.ID, "user")
+		req.SetPathValue("id", itoa(user.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("unauthenticated", func(t *testing.T) {
+		wrapped := wrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {}, "admin")
+
+		req := httptest.NewRequest(http.MethodPut, "/api/users/1/password", nil)
+		req.SetPathValue("id", "1")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", rec.Code)
+		}
+	})
+}
+
 func itoa(id int64) string {
 	return strconv.FormatInt(id, 10)
 }

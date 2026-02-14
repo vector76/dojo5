@@ -312,6 +312,124 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type changeRoleRequest struct {
+	Role string `json:"role"`
+}
+
+func (h *UserHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	var req changeRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Role == "" {
+		http.Error(w, "role is required", http.StatusBadRequest)
+		return
+	}
+	if !validRoles[req.Role] {
+		http.Error(w, "invalid role", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.users.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if user.DeletedAt != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	// Prevent demoting the last admin
+	if user.Role == "admin" && req.Role != "admin" {
+		count, err := h.users.CountByRole("admin")
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if count <= 1 {
+			http.Error(w, "cannot demote the last admin", http.StatusConflict)
+			return
+		}
+	}
+
+	user.Role = req.Role
+	if err := h.users.Update(user); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+type resetPasswordRequest struct {
+	Password string `json:"password"`
+}
+
+func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Password == "" {
+		http.Error(w, "password is required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.users.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if user.DeletedAt != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	user.PasswordHash = hash
+	if err := h.users.Update(user); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
