@@ -29,7 +29,8 @@ func TestHealthEndpoint(t *testing.T) {
 	classTypeHandler := handlers.NewClassTypeHandler(classTypeRepo)
 	classHandler := handlers.NewClassHandler(classRepo)
 	paymentHandler := handlers.NewPaymentHandler(paymentRepo)
-	handler := newMux("test-secret", authHandler, userHandler, classTypeHandler, classHandler, paymentHandler)
+	balanceHandler := handlers.NewBalanceHandler(paymentRepo, userRepo)
+	handler := newMux("test-secret", authHandler, userHandler, classTypeHandler, classHandler, paymentHandler, balanceHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
