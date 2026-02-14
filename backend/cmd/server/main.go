@@ -13,7 +13,7 @@ import (
 	"dojo-crm/backend/internal/models"
 )
 
-func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler) *http.ServeMux {
+func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, classTypeHandler *handlers.ClassTypeHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
@@ -29,6 +29,13 @@ func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *ha
 	mux.Handle("DELETE /api/users/{id}", chain(userHandler.Delete, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 	mux.Handle("PUT /api/users/{id}/role", chain(userHandler.ChangeRole, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 	mux.Handle("PUT /api/users/{id}/password", chain(userHandler.ResetPassword, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+
+	// Class type endpoints
+	mux.Handle("GET /api/class-types", chain(classTypeHandler.List, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
+	mux.Handle("GET /api/class-types/{id}", chain(classTypeHandler.Get, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
+	mux.Handle("POST /api/class-types", chain(classTypeHandler.Create, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+	mux.Handle("PUT /api/class-types/{id}", chain(classTypeHandler.Update, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+	mux.Handle("DELETE /api/class-types/{id}", chain(classTypeHandler.Delete, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 
 	return mux
 }
@@ -85,11 +92,13 @@ func main() {
 	}
 
 	userRepo := models.NewUserRepo(db)
+	classTypeRepo := models.NewClassTypeRepo(db)
 	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
 	userHandler := handlers.NewUserHandler(userRepo)
+	classTypeHandler := handlers.NewClassTypeHandler(classTypeRepo)
 
 	fmt.Printf("Starting server on %s\n", addr)
-	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler)); err != nil {
+	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler, classTypeHandler)); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)
 	}

@@ -21,9 +21,11 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	defer db.Close()
 	userRepo := models.NewUserRepo(db)
+	classTypeRepo := models.NewClassTypeRepo(db)
 	authHandler := handlers.NewAuthHandler(userRepo, "test-secret")
 	userHandler := handlers.NewUserHandler(userRepo)
-	handler := newMux("test-secret", authHandler, userHandler)
+	classTypeHandler := handlers.NewClassTypeHandler(classTypeRepo)
+	handler := newMux("test-secret", authHandler, userHandler, classTypeHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
