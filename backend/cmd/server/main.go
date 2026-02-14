@@ -13,7 +13,7 @@ import (
 	"dojo-crm/backend/internal/models"
 )
 
-func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, classTypeHandler *handlers.ClassTypeHandler, classHandler *handlers.ClassHandler, paymentHandler *handlers.PaymentHandler, balanceHandler *handlers.BalanceHandler) *http.ServeMux {
+func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, classTypeHandler *handlers.ClassTypeHandler, classHandler *handlers.ClassHandler, paymentHandler *handlers.PaymentHandler, balanceHandler *handlers.BalanceHandler, attendanceHandler *handlers.AttendanceHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
@@ -51,6 +51,11 @@ func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *ha
 	// Balance endpoints
 	mux.Handle("GET /api/users/{id}/balance", chain(balanceHandler.Get, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "user")))
 	mux.Handle("PUT /api/users/{id}/balance", chain(balanceHandler.Set, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+
+	// Attendance endpoints
+	mux.Handle("POST /api/classes/{id}/attendance", chain(attendanceHandler.Record, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor")))
+	mux.Handle("GET /api/classes/{id}/attendance", chain(attendanceHandler.ListByClass, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor")))
+	mux.Handle("GET /api/users/{id}/attendance", chain(attendanceHandler.ListByUser, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
 
 	return mux
 }
@@ -116,9 +121,11 @@ func main() {
 	classHandler := handlers.NewClassHandler(classRepo)
 	paymentHandler := handlers.NewPaymentHandler(paymentRepo)
 	balanceHandler := handlers.NewBalanceHandler(paymentRepo, userRepo)
+	attendanceRepo := models.NewAttendanceRepo(db)
+	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo)
 
 	fmt.Printf("Starting server on %s\n", addr)
-	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler, classTypeHandler, classHandler, paymentHandler, balanceHandler)); err != nil {
+	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler, classTypeHandler, classHandler, paymentHandler, balanceHandler, attendanceHandler)); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)
 	}

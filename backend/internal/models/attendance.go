@@ -33,6 +33,11 @@ func (r *AttendanceRepo) RecordAttendance(a *Attendance) error {
 		return fmt.Errorf("getting last insert id: %w", err)
 	}
 	a.ID = id
+
+	// Read back the DB-generated checked_in_at timestamp
+	if err := r.db.QueryRow(`SELECT checked_in_at FROM attendance WHERE id = ?`, a.ID).Scan(&a.CheckedInAt); err != nil {
+		return fmt.Errorf("reading checked_in_at: %w", err)
+	}
 	return nil
 }
 
