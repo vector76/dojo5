@@ -17,6 +17,9 @@ func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *ha
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+	mux.Handle("GET /api/auth/me", chain(authHandler.Me, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
+	mux.HandleFunc("GET /api/auth/setup-status", authHandler.SetupStatus)
+	mux.HandleFunc("POST /api/auth/setup", authHandler.Setup)
 
 	// User endpoints
 	mux.Handle("GET /api/users", chain(userHandler.List, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor")))

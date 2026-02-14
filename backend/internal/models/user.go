@@ -105,6 +105,15 @@ func (r *UserRepo) SoftDelete(id int64) error {
 	return nil
 }
 
+func (r *UserRepo) Count() (int64, error) {
+	var count int64
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting users: %w", err)
+	}
+	return count, nil
+}
+
 func (r *UserRepo) scanUser(row *sql.Row) (*User, error) {
 	var u User
 	err := row.Scan(
