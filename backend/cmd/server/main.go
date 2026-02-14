@@ -13,7 +13,7 @@ import (
 	"dojo-crm/backend/internal/models"
 )
 
-func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, classTypeHandler *handlers.ClassTypeHandler, classHandler *handlers.ClassHandler) *http.ServeMux {
+func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler, classTypeHandler *handlers.ClassTypeHandler, classHandler *handlers.ClassHandler, paymentHandler *handlers.PaymentHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
@@ -43,6 +43,10 @@ func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *ha
 	mux.Handle("POST /api/classes", chain(classHandler.Create, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 	mux.Handle("PUT /api/classes/{id}", chain(classHandler.Update, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
 	mux.Handle("DELETE /api/classes/{id}", chain(classHandler.Delete, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+
+	// Payment endpoints
+	mux.Handle("POST /api/payments", chain(paymentHandler.Create, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+	mux.Handle("GET /api/users/{id}/payments", chain(paymentHandler.ListByUser, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "user")))
 
 	return mux
 }
@@ -101,13 +105,15 @@ func main() {
 	userRepo := models.NewUserRepo(db)
 	classTypeRepo := models.NewClassTypeRepo(db)
 	classRepo := models.NewClassRepo(db)
+	paymentRepo := models.NewPaymentRepo(db)
 	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
 	userHandler := handlers.NewUserHandler(userRepo)
 	classTypeHandler := handlers.NewClassTypeHandler(classTypeRepo)
 	classHandler := handlers.NewClassHandler(classRepo)
+	paymentHandler := handlers.NewPaymentHandler(paymentRepo)
 
 	fmt.Printf("Starting server on %s\n", addr)
-	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler, classTypeHandler, classHandler)); err != nil {
+	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler, classTypeHandler, classHandler, paymentHandler)); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)
 	}
