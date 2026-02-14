@@ -1,0 +1,10 @@
+CREATE TABLE classes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    class_type_id INTEGER NOT NULL REFERENCES class_types(id),
+    instructor_id INTEGER NOT NULL REFERENCES users(id),
+    start_time DATETIME NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    capacity INTEGER NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
