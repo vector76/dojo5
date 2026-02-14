@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"dojo-crm/backend/internal/auth"
@@ -128,6 +131,185 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
+}
+
+func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	claims := auth.UserFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Only admin, instructor, or the user themselves can view
+	if claims.Role != "admin" && claims.Role != "instructor" && claims.UserID != id {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	user, err := h.users.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if user.DeletedAt != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+type updateUserRequest struct {
+	Name             *string `json:"name"`
+	Email            *string `json:"email"`
+	Phone            *string `json:"phone"`
+	Role             *string `json:"role"`
+	Password         *string `json:"password"`
+	MembershipType   *string `json:"membership_type"`
+	MembershipStatus *string `json:"membership_status"`
+	EmergencyContact *string `json:"emergency_contact"`
+	JoinDate         *string `json:"join_date"`
+}
+
+func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	claims := auth.UserFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	isSelf := claims.UserID == id
+	isAdmin := claims.Role == "admin"
+
+	if !isAdmin && !isSelf {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req updateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Non-admin users cannot change role or membership fields
+	if !isAdmin {
+		if req.Role != nil {
+			http.Error(w, "only admins can change role", http.StatusForbidden)
+			return
+		}
+		if req.MembershipType != nil || req.MembershipStatus != nil || req.JoinDate != nil {
+			http.Error(w, "only admins can change membership fields", http.StatusForbidden)
+			return
+		}
+	}
+
+	if req.Role != nil && !validRoles[*req.Role] {
+		http.Error(w, "invalid role", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.users.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if user.DeletedAt != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	// Apply partial updates
+	if req.Name != nil {
+		user.Name = *req.Name
+	}
+	if req.Email != nil {
+		user.Email = *req.Email
+	}
+	if req.Phone != nil {
+		user.Phone = *req.Phone
+	}
+	if req.Role != nil {
+		user.Role = *req.Role
+	}
+	if req.Password != nil {
+		hash, err := auth.HashPassword(*req.Password)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		user.PasswordHash = hash
+	}
+	if req.MembershipType != nil {
+		user.MembershipType = req.MembershipType
+	}
+	if req.MembershipStatus != nil {
+		user.MembershipStatus = req.MembershipStatus
+	}
+	if req.EmergencyContact != nil {
+		user.EmergencyContact = req.EmergencyContact
+	}
+	if req.JoinDate != nil {
+		user.JoinDate = req.JoinDate
+	}
+
+	if err := h.users.Update(user); err != nil {
+		if isUniqueViolation(err) {
+			http.Error(w, "email already exists", http.StatusConflict)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.users.SoftDelete(id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func isUniqueViolation(err error) bool {

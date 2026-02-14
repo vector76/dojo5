@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -36,6 +37,412 @@ func wrapWithMiddleware(handler http.HandlerFunc, roles ...string) http.Handler 
 	h = auth.RequireRole(roles...)(h)
 	h = auth.AuthMiddleware(testJWTSecret)(h)
 	return h
+}
+
+func TestUserHandler_Get(t *testing.T) {
+	db := setupTestDB(t)
+	repo := models.NewUserRepo(db)
+	handler := NewUserHandler(repo)
+
+	admin := createTestUser(t, repo, "get-admin@example.com", "password", "admin")
+	instructor := createTestUser(t, repo, "get-inst@example.com", "password", "instructor")
+	user := createTestUser(t, repo, "get-user@example.com", "password", "user")
+
+	deleted := createTestUser(t, repo, "get-deleted@example.com", "password", "user")
+	if err := repo.SoftDelete(deleted.ID); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	wrapped := wrapWithMiddleware(handler.Get, "admin", "instructor", "user")
+
+	t.Run("admin can get any user", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodGet, "/api/users/"+itoa(user.ID), nil, admin.ID, "admin")
+		req.SetPathValue("id", itoa(user.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var resp userResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if resp.ID != user.ID {
+			t.Errorf("expected id %d, got %d", user.ID, resp.ID)
+		}
+	})
+
+	t.Run("instructor can get any user", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodGet, "/api/users/"+itoa(user.ID), nil, instructor.ID, "instructor")
+		req.SetPathValue("id", itoa(user.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", rec.Code)
+		}
+	})
+
+	t.Run("user can get self", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodGet, "/api/users/"+itoa(user.ID), nil, user.ID, "user")
+		req.SetPathValue("id", itoa(user.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", rec.Code)
+		}
+	})
+
+	t.Run("user cannot get other user", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodGet, "/api/users/"+itoa(admin.ID), nil, user.ID, "user")
+		req.SetPathValue("id", itoa(admin.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("soft-deleted user returns 404", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodGet, "/api/users/"+itoa(deleted.ID), nil, admin.ID, "admin")
+		req.SetPathValue("id", itoa(deleted.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("nonexistent user returns 404", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodGet, "/api/users/9999", nil, admin.ID, "admin")
+		req.SetPathValue("id", "9999")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("unauthenticated", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/users/1", nil)
+		req.SetPathValue("id", "1")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", rec.Code)
+		}
+	})
+}
+
+func TestUserHandler_Update(t *testing.T) {
+	t.Run("admin updates any user", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "upd-admin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "upd-target@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"name": "Updated Name", "role": "instructor"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID), body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var resp userResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if resp.Name != "Updated Name" {
+			t.Errorf("expected name 'Updated Name', got %q", resp.Name)
+		}
+		if resp.Role != "instructor" {
+			t.Errorf("expected role 'instructor', got %q", resp.Role)
+		}
+	})
+
+	t.Run("user updates self", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		user := createTestUser(t, repo, "selfupd@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"name": "New Name", "phone": "555-9999"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(user.ID), body, user.ID, "user")
+		req.SetPathValue("id", itoa(user.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var resp userResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if resp.Name != "New Name" {
+			t.Errorf("expected name 'New Name', got %q", resp.Name)
+		}
+		if resp.Phone != "555-9999" {
+			t.Errorf("expected phone '555-9999', got %q", resp.Phone)
+		}
+	})
+
+	t.Run("user cannot change role", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		user := createTestUser(t, repo, "norole@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"role": "admin"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(user.ID), body, user.ID, "user")
+		req.SetPathValue("id", itoa(user.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("user cannot change membership fields", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		user := createTestUser(t, repo, "nomembership@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"membership_type": "premium"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(user.ID), body, user.ID, "user")
+		req.SetPathValue("id", itoa(user.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("user cannot update other user", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		user := createTestUser(t, repo, "other1@example.com", "password", "user")
+		other := createTestUser(t, repo, "other2@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"name": "Hacked"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(other.ID), body, user.ID, "user")
+		req.SetPathValue("id", itoa(other.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("duplicate email returns conflict", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "dupadmin@example.com", "password", "admin")
+		createTestUser(t, repo, "existing@example.com", "password", "user")
+		target := createTestUser(t, repo, "duptarget@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"email": "existing@example.com"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID), body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Errorf("expected 409, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid role returns bad request", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "roleadmin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "roletarget@example.com", "password", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"role": "superadmin"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID), body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("update nonexistent user returns 404", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "404admin@example.com", "password", "admin")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"name": "Ghost"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/9999", body, admin.ID, "admin")
+		req.SetPathValue("id", "9999")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("admin can update password", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := models.NewUserRepo(db)
+		handler := NewUserHandler(repo)
+
+		admin := createTestUser(t, repo, "passadmin@example.com", "password", "admin")
+		target := createTestUser(t, repo, "passtarget@example.com", "oldpass", "user")
+
+		wrapped := wrapWithMiddleware(handler.Update, "admin", "instructor", "user")
+
+		body, _ := json.Marshal(map[string]string{"password": "newpass123"})
+		req, _ := authedRequest(t, http.MethodPut, "/api/users/"+itoa(target.ID), body, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify new password works
+		updated, _ := repo.GetByEmail("passtarget@example.com")
+		if err := auth.CheckPassword(updated.PasswordHash, "newpass123"); err != nil {
+			t.Error("new password should be valid")
+		}
+	})
+}
+
+func TestUserHandler_Delete(t *testing.T) {
+	db := setupTestDB(t)
+	repo := models.NewUserRepo(db)
+	handler := NewUserHandler(repo)
+
+	admin := createTestUser(t, repo, "del-admin@example.com", "password", "admin")
+	target := createTestUser(t, repo, "del-target@example.com", "password", "user")
+	createTestUser(t, repo, "del-inst@example.com", "password", "instructor")
+	regularUser := createTestUser(t, repo, "del-user@example.com", "password", "user")
+
+	wrapped := wrapWithMiddleware(handler.Delete, "admin")
+
+	t.Run("admin can delete user", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodDelete, "/api/users/"+itoa(target.ID), nil, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNoContent {
+			t.Errorf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify soft-deleted
+		u, err := repo.GetByID(target.ID)
+		if err != nil {
+			t.Fatalf("get: %v", err)
+		}
+		if u.DeletedAt == nil {
+			t.Error("expected user to be soft-deleted")
+		}
+	})
+
+	t.Run("delete already deleted returns 404", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodDelete, "/api/users/"+itoa(target.ID), nil, admin.ID, "admin")
+		req.SetPathValue("id", itoa(target.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("delete nonexistent returns 404", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodDelete, "/api/users/9999", nil, admin.ID, "admin")
+		req.SetPathValue("id", "9999")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("instructor cannot delete", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodDelete, "/api/users/"+itoa(regularUser.ID), nil, 3, "instructor")
+		req.SetPathValue("id", itoa(regularUser.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("regular user cannot delete", func(t *testing.T) {
+		req, _ := authedRequest(t, http.MethodDelete, "/api/users/"+itoa(regularUser.ID), nil, regularUser.ID, "user")
+		req.SetPathValue("id", itoa(regularUser.ID))
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("unauthenticated", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/api/users/1", nil)
+		req.SetPathValue("id", "1")
+		rec := httptest.NewRecorder()
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", rec.Code)
+		}
+	})
+}
+
+func itoa(id int64) string {
+	return strconv.FormatInt(id, 10)
 }
 
 func TestUserHandler_List(t *testing.T) {
