@@ -7,16 +7,31 @@ import (
 	"os"
 	"path/filepath"
 
+	"dojo-crm/backend/internal/auth"
 	"dojo-crm/backend/internal/database"
 	"dojo-crm/backend/internal/handlers"
 	"dojo-crm/backend/internal/models"
 )
 
-func newMux(authHandler *handlers.AuthHandler) *http.ServeMux {
+func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *handlers.UserHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+
+	// User endpoints
+	mux.Handle("GET /api/users", chain(userHandler.List, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor")))
+	mux.Handle("POST /api/users", chain(userHandler.Create, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin")))
+
 	return mux
+}
+
+// chain wraps an http.HandlerFunc with middleware (applied inside-out).
+func chain(h http.HandlerFunc, middlewares ...func(http.Handler) http.Handler) http.Handler {
+	var handler http.Handler = h
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i](handler)
+	}
+	return handler
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -63,9 +78,10 @@ func main() {
 
 	userRepo := models.NewUserRepo(db)
 	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
+	userHandler := handlers.NewUserHandler(userRepo)
 
 	fmt.Printf("Starting server on %s\n", addr)
-	if err := http.ListenAndServe(addr, newMux(authHandler)); err != nil {
+	if err := http.ListenAndServe(addr, newMux(jwtSecret, authHandler, userHandler)); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		os.Exit(1)
 	}

@@ -20,8 +20,10 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("failed to open db: %v", err)
 	}
 	defer db.Close()
-	authHandler := handlers.NewAuthHandler(models.NewUserRepo(db), "test-secret")
-	handler := newMux(authHandler)
+	userRepo := models.NewUserRepo(db)
+	authHandler := handlers.NewAuthHandler(userRepo, "test-secret")
+	userHandler := handlers.NewUserHandler(userRepo)
+	handler := newMux("test-secret", authHandler, userHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
