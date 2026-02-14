@@ -5,10 +5,23 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"dojo-crm/backend/internal/handlers"
+	"dojo-crm/backend/internal/models"
+
+	"dojo-crm/backend/internal/database"
+	"path/filepath"
 )
 
 func TestHealthEndpoint(t *testing.T) {
-	handler := newMux()
+	dir := t.TempDir()
+	db, err := database.Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer db.Close()
+	authHandler := handlers.NewAuthHandler(models.NewUserRepo(db), "test-secret")
+	handler := newMux(authHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
