@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { apiFetch } from '../api'
 import { useAuth } from '../auth'
+import { BalanceSummary } from '../components/BalanceSummary'
 
 interface MemberData {
   id: number
@@ -260,14 +261,11 @@ export function MemberDetail() {
           <section aria-label="Balance Management">
             <h2>Balance</h2>
             {balance && (
-              <dl>
-                <dt>Expected Balance</dt>
-                <dd>${balance.expected_balance.toFixed(2)}</dd>
-                <dt>Total Paid</dt>
-                <dd>${balance.total_paid.toFixed(2)}</dd>
-                <dt>Outstanding Balance</dt>
-                <dd>${balance.balance.toFixed(2)}</dd>
-              </dl>
+              <BalanceSummary
+                expected_balance={balance.expected_balance}
+                total_paid={balance.total_paid}
+                balance={balance.balance}
+              />
             )}
             <form onSubmit={handleSetBalance}>
               <div>

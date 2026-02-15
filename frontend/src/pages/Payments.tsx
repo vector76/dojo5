@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../api'
+import { BalanceSummary } from '../components/BalanceSummary'
 
 interface Member {
   id: number
@@ -167,14 +168,11 @@ export function Payments() {
         {historyError && <div role="alert">{historyError}</div>}
 
         {balance && !historyLoading && (
-          <dl>
-            <dt>Expected Balance</dt>
-            <dd>${balance.expected_balance.toFixed(2)}</dd>
-            <dt>Total Paid</dt>
-            <dd>${balance.total_paid.toFixed(2)}</dd>
-            <dt>Outstanding Balance</dt>
-            <dd>${balance.balance.toFixed(2)}</dd>
-          </dl>
+          <BalanceSummary
+            expected_balance={balance.expected_balance}
+            total_paid={balance.total_paid}
+            balance={balance.balance}
+          />
         )}
 
         {payments.length > 0 && !historyLoading && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../api'
 import { useAuth } from '../auth'
+import { BalanceSummary } from '../components/BalanceSummary'
 
 interface Payment {
   id: number
@@ -51,14 +52,11 @@ export function MyPayments() {
       <h1>My Payments</h1>
 
       {balance && (
-        <dl>
-          <dt>Expected Balance</dt>
-          <dd>${balance.expected_balance.toFixed(2)}</dd>
-          <dt>Total Paid</dt>
-          <dd>${balance.total_paid.toFixed(2)}</dd>
-          <dt>Outstanding Balance</dt>
-          <dd>${balance.balance.toFixed(2)}</dd>
-        </dl>
+        <BalanceSummary
+          expected_balance={balance.expected_balance}
+          total_paid={balance.total_paid}
+          balance={balance.balance}
+        />
       )}
 
       {payments.length > 0 ? (
