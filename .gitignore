@@ -4,3 +4,4 @@ CLAUDE.md
 .claude/
 dojo-crm
 /migrations
+backend/internal/frontend/dist/
