@@ -20,8 +20,12 @@ export function Layout() {
           <li><NavLink to="/profile">Profile</NavLink></li>
           <li><NavLink to="/classes">Classes</NavLink></li>
           <li><NavLink to="/my-payments">My Payments</NavLink></li>
+          <li><NavLink to="/my-attendance">My Attendance</NavLink></li>
           {isAdminOrInstructor && (
             <li><NavLink to="/members">Members</NavLink></li>
+          )}
+          {isAdminOrInstructor && (
+            <li><NavLink to="/attendance">Attendance</NavLink></li>
           )}
           {isAdmin && (
             <li><NavLink to="/payments">Payments</NavLink></li>

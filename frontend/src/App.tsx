@@ -13,6 +13,8 @@ import { ClassTypes } from './pages/ClassTypes'
 import { Payments } from './pages/Payments'
 import { MyPayments } from './pages/MyPayments'
 import { Classes } from './pages/Classes'
+import { Attendance } from './pages/Attendance'
+import { MyAttendance } from './pages/MyAttendance'
 
 function App() {
   return (
@@ -31,6 +33,8 @@ function App() {
             <Route path="class-types" element={<ClassTypes />} />
             <Route path="payments" element={<Payments />} />
             <Route path="my-payments" element={<MyPayments />} />
+            <Route path="attendance" element={<Attendance />} />
+            <Route path="my-attendance" element={<MyAttendance />} />
           </Route>
         </Routes>
       </AuthProvider>
