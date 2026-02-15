@@ -6,6 +6,9 @@ import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Setup } from './pages/Setup'
 import { Members } from './pages/Members'
+import { MemberDetail } from './pages/MemberDetail'
+import { AddMember } from './pages/AddMember'
+import { ProfileEdit } from './pages/ProfileEdit'
 
 function App() {
   return (
@@ -17,6 +20,9 @@ function App() {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="members" element={<Members />} />
+            <Route path="members/new" element={<AddMember />} />
+            <Route path="members/:id" element={<MemberDetail />} />
+            <Route path="profile" element={<ProfileEdit />} />
           </Route>
         </Routes>
       </AuthProvider>

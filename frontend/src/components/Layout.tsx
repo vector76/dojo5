@@ -17,6 +17,7 @@ export function Layout() {
         </div>
         <ul>
           <li><NavLink to="/">Dashboard</NavLink></li>
+          <li><NavLink to="/profile">Profile</NavLink></li>
           <li><NavLink to="/classes">Classes</NavLink></li>
           {isAdminOrInstructor && (
             <li><NavLink to="/members">Members</NavLink></li>

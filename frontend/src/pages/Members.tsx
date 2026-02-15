@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { useAuth } from '../auth'
 
 interface Member {
   id: number
@@ -12,6 +14,8 @@ interface Member {
 }
 
 export function Members() {
+  const { user: currentUser } = useAuth()
+  const isAdmin = currentUser?.role === 'admin'
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -57,6 +61,7 @@ export function Members() {
   return (
     <div>
       <h1>Members</h1>
+      {isAdmin && <Link to="/members/new">Add Member</Link>}
       <div className="filters">
         <input
           type="text"
@@ -99,7 +104,7 @@ export function Members() {
         <tbody>
           {filtered.map(m => (
             <tr key={m.id}>
-              <td>{m.name}</td>
+              <td><Link to={`/members/${m.id}`}>{m.name}</Link></td>
               <td>{m.email}</td>
               <td>{m.phone}</td>
               <td>{m.role}</td>
