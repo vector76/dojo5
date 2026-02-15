@@ -40,8 +40,19 @@ export async function apiFetch(
   const response = await fetch(path, { ...options, headers })
 
   if (!response.ok) {
-    const text = await response.text().catch(() => response.statusText)
-    throw new ApiError(response.status, text)
+    let message = response.statusText
+    try {
+      const text = await response.text()
+      try {
+        const body = JSON.parse(text)
+        message = body.error || message
+      } catch {
+        message = text || message
+      }
+    } catch {
+      // body unreadable, keep statusText
+    }
+    throw new ApiError(response.status, message)
   }
 
   return response

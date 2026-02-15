@@ -92,6 +92,37 @@ describe('apiFetch', () => {
     }
   })
 
+  it('parses JSON error message from response body', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: 'email already exists' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    try {
+      await apiFetch('/api/test')
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).status).toBe(409)
+      expect((err as ApiError).message).toBe('email already exists')
+    }
+  })
+
+  it('falls back to plain text error message', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('something went wrong', { status: 500 }),
+    )
+
+    try {
+      await apiFetch('/api/test')
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).status).toBe(500)
+      expect((err as ApiError).message).toBe('something went wrong')
+    }
+  })
+
   it('returns response on success', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),

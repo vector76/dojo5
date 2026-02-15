@@ -28,6 +28,7 @@ export function ClassTypes() {
       const res = await apiFetch('/api/class-types')
       const data: ClassType[] = await res.json()
       setClassTypes(data)
+      setError('')
     } catch {
       setError('Failed to load class types')
     } finally {
@@ -91,17 +92,22 @@ export function ClassTypes() {
     try {
       await apiFetch(`/api/class-types/${id}`, { method: 'DELETE' })
       setClassTypes(prev => prev.filter(ct => ct.id !== id))
+      setError('')
     } catch {
       setError('Failed to delete class type')
     }
   }
 
+  // Show delete errors inline rather than hiding the page
+  const showPageError = error && classTypes.length === 0
+
   if (loading) return <div>Loading...</div>
-  if (error) return <div role="alert">{error}</div>
+  if (showPageError) return <div role="alert">{error}</div>
 
   return (
     <div>
       <h1>Class Types</h1>
+      {error && <div role="alert">{error}</div>}
       <button onClick={startCreate}>Add Class Type</button>
 
       {editingId !== null && (

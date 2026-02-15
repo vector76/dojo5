@@ -72,6 +72,7 @@ export function Attendance() {
   async function loadAttendance(classId: string) {
     setLoadingAttendance(true)
     setCheckInError('')
+    setError('')
     try {
       const res = await apiFetch(`/api/classes/${classId}/attendance`)
       const data: AttendanceRecord[] = await res.json()

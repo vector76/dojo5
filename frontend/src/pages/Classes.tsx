@@ -187,6 +187,7 @@ export function Classes() {
     try {
       await apiFetch(`/api/classes/${id}`, { method: 'DELETE' })
       setClasses(prev => prev.filter(c => c.id !== id))
+      setError('')
     } catch {
       setError('Failed to delete class')
     }

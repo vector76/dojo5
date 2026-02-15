@@ -41,18 +41,18 @@ type recordAttendanceRequest struct {
 func (h *AttendanceHandler) Record(w http.ResponseWriter, r *http.Request) {
 	classID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid class id", http.StatusBadRequest)
+		writeError(w, "invalid class id", http.StatusBadRequest)
 		return
 	}
 
 	var req recordAttendanceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.UserID == 0 {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
+		writeError(w, "user_id is required", http.StatusBadRequest)
 		return
 	}
 
@@ -62,27 +62,27 @@ func (h *AttendanceHandler) Record(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.attendance.RecordAttendance(a); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(toAttendanceResponse(a)); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }
 
 func (h *AttendanceHandler) ListByClass(w http.ResponseWriter, r *http.Request) {
 	classID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid class id", http.StatusBadRequest)
+		writeError(w, "invalid class id", http.StatusBadRequest)
 		return
 	}
 
 	records, err := h.attendance.ListByClass(classID)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -93,32 +93,32 @@ func (h *AttendanceHandler) ListByClass(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }
 
 func (h *AttendanceHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 	userID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+		writeError(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
 	claims := auth.UserFromContext(r.Context())
 	if claims == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		writeError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Admin and instructor can view any user; users can only view their own
 	if claims.Role != "admin" && claims.Role != "instructor" && claims.UserID != userID {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		writeError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
 	records, err := h.attendance.ListByUser(userID)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -129,6 +129,6 @@ func (h *AttendanceHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }

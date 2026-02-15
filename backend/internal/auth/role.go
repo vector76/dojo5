@@ -15,12 +15,12 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims := UserFromContext(r.Context())
 			if claims == nil {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				writeError(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 
 			if !allowed[claims.Role] {
-				http.Error(w, "forbidden", http.StatusForbidden)
+				writeError(w, "forbidden", http.StatusForbidden)
 				return
 			}
 

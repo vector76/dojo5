@@ -63,7 +63,7 @@ func toUserResponse(u *models.User) userResponse {
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	users, err := h.users.List()
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -74,24 +74,24 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }
 
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.Name == "" || req.Email == "" || req.Phone == "" {
-		http.Error(w, "name, email, and phone are required", http.StatusBadRequest)
+		writeError(w, "name, email, and phone are required", http.StatusBadRequest)
 		return
 	}
 
 	if req.Password == "" {
-		http.Error(w, "password is required", http.StatusBadRequest)
+		writeError(w, "password is required", http.StatusBadRequest)
 		return
 	}
 
@@ -99,13 +99,13 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		req.Role = "user"
 	}
 	if !validRoles[req.Role] {
-		http.Error(w, "invalid role", http.StatusBadRequest)
+		writeError(w, "invalid role", http.StatusBadRequest)
 		return
 	}
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -119,57 +119,57 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.users.Create(user); err != nil {
 		if isUniqueViolation(err) {
-			http.Error(w, "email already exists", http.StatusConflict)
+			writeError(w, "email already exists", http.StatusConflict)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }
 
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+		writeError(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
 	claims := auth.UserFromContext(r.Context())
 	if claims == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		writeError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Only admin, instructor, or the user themselves can view
 	if claims.Role != "admin" && claims.Role != "instructor" && claims.UserID != id {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		writeError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
 	user, err := h.users.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "user not found", http.StatusNotFound)
+			writeError(w, "user not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	if user.DeletedAt != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
+		writeError(w, "user not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }
 
@@ -188,13 +188,13 @@ type updateUserRequest struct {
 func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+		writeError(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
 	claims := auth.UserFromContext(r.Context())
 	if claims == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		writeError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -202,45 +202,45 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	isAdmin := claims.Role == "admin"
 
 	if !isAdmin && !isSelf {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		writeError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
 	var req updateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Non-admin users cannot change role or membership fields
 	if !isAdmin {
 		if req.Role != nil {
-			http.Error(w, "only admins can change role", http.StatusForbidden)
+			writeError(w, "only admins can change role", http.StatusForbidden)
 			return
 		}
 		if req.MembershipType != nil || req.MembershipStatus != nil || req.JoinDate != nil {
-			http.Error(w, "only admins can change membership fields", http.StatusForbidden)
+			writeError(w, "only admins can change membership fields", http.StatusForbidden)
 			return
 		}
 	}
 
 	if req.Role != nil && !validRoles[*req.Role] {
-		http.Error(w, "invalid role", http.StatusBadRequest)
+		writeError(w, "invalid role", http.StatusBadRequest)
 		return
 	}
 
 	user, err := h.users.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "user not found", http.StatusNotFound)
+			writeError(w, "user not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	if user.DeletedAt != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
+		writeError(w, "user not found", http.StatusNotFound)
 		return
 	}
 
@@ -260,7 +260,7 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Password != nil {
 		hash, err := auth.HashPassword(*req.Password)
 		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		user.PasswordHash = hash
@@ -280,32 +280,32 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.users.Update(user); err != nil {
 		if isUniqueViolation(err) {
-			http.Error(w, "email already exists", http.StatusConflict)
+			writeError(w, "email already exists", http.StatusConflict)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }
 
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+		writeError(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.users.SoftDelete(id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "user not found", http.StatusNotFound)
+			writeError(w, "user not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -319,37 +319,37 @@ type changeRoleRequest struct {
 func (h *UserHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+		writeError(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
 	var req changeRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.Role == "" {
-		http.Error(w, "role is required", http.StatusBadRequest)
+		writeError(w, "role is required", http.StatusBadRequest)
 		return
 	}
 	if !validRoles[req.Role] {
-		http.Error(w, "invalid role", http.StatusBadRequest)
+		writeError(w, "invalid role", http.StatusBadRequest)
 		return
 	}
 
 	user, err := h.users.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "user not found", http.StatusNotFound)
+			writeError(w, "user not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	if user.DeletedAt != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
+		writeError(w, "user not found", http.StatusNotFound)
 		return
 	}
 
@@ -357,24 +357,24 @@ func (h *UserHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 	if user.Role == "admin" && req.Role != "admin" {
 		count, err := h.users.CountByRole("admin")
 		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			writeError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		if count <= 1 {
-			http.Error(w, "cannot demote the last admin", http.StatusConflict)
+			writeError(w, "cannot demote the last admin", http.StatusConflict)
 			return
 		}
 	}
 
 	user.Role = req.Role
 	if err := h.users.Update(user); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(toUserResponse(user)); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 	}
 }
 
@@ -385,45 +385,45 @@ type resetPasswordRequest struct {
 func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+		writeError(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
 	var req resetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.Password == "" {
-		http.Error(w, "password is required", http.StatusBadRequest)
+		writeError(w, "password is required", http.StatusBadRequest)
 		return
 	}
 
 	user, err := h.users.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "user not found", http.StatusNotFound)
+			writeError(w, "user not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	if user.DeletedAt != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
+		writeError(w, "user not found", http.StatusNotFound)
 		return
 	}
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	user.PasswordHash = hash
 	if err := h.users.Update(user); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 

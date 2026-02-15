@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,6 +10,14 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+func writeError(w http.ResponseWriter, message string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(struct {
+		Error string `json:"error"`
+	}{Error: message})
+}
 
 // Claims holds the custom JWT claims for a user session.
 type Claims struct {
@@ -61,19 +70,19 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
 			if header == "" {
-				http.Error(w, "missing authorization header", http.StatusUnauthorized)
+				writeError(w, "missing authorization header", http.StatusUnauthorized)
 				return
 			}
 
 			tokenStr, found := strings.CutPrefix(header, "Bearer ")
 			if !found {
-				http.Error(w, "invalid authorization header format", http.StatusUnauthorized)
+				writeError(w, "invalid authorization header format", http.StatusUnauthorized)
 				return
 			}
 
 			claims, err := ValidateToken(secret, tokenStr)
 			if err != nil {
-				http.Error(w, "invalid token", http.StatusUnauthorized)
+				writeError(w, "invalid token", http.StatusUnauthorized)
 				return
 			}
 
