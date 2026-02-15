@@ -9,6 +9,7 @@ import { Members } from './pages/Members'
 import { MemberDetail } from './pages/MemberDetail'
 import { AddMember } from './pages/AddMember'
 import { ProfileEdit } from './pages/ProfileEdit'
+import { ClassTypes } from './pages/ClassTypes'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
             <Route path="members/new" element={<AddMember />} />
             <Route path="members/:id" element={<MemberDetail />} />
             <Route path="profile" element={<ProfileEdit />} />
+            <Route path="class-types" element={<ClassTypes />} />
           </Route>
         </Routes>
       </AuthProvider>
