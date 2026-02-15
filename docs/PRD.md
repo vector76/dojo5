@@ -103,11 +103,45 @@ A lightweight CRM system for managing a small martial arts dojo or yoga studio, 
 └── README.md
 ```
 
+## Frontend Design Guidelines
+
+### CSS Styling Philosophy
+The application should have a **clean, simple, modern look** with the following principles:
+
+- **Visual Hierarchy**: Clear distinction between sections using cards, borders, and shadows
+- **Typography**: Modern system fonts with appropriate sizing and spacing
+- **Color Scheme**: Support both light and dark modes with proper contrast ratios
+- **Spacing**: Generous padding and margins for readability
+- **Interactive Elements**:
+  - Buttons with hover effects, subtle shadows, and proper focus states
+  - Inputs with focus rings and clear borders
+  - Tables with hover states and clean borders
+- **Accessibility**:
+  - Proper focus-visible states for keyboard navigation
+  - Sufficient color contrast (WCAG AA compliant)
+  - Clear visual feedback for interactive elements
+- **Responsive**: Mobile-first approach with collapsible sidebar and stacked layouts
+
+**Implementation Notes**:
+- Use `index.css` for global styles (typography, forms, tables, buttons)
+- Use `App.css` for component-specific styles (sidebar, layout, sections)
+- Import `App.css` in `App.tsx` to ensure styles are bundled
+- Leverage CSS variables and media queries for theming
+- Avoid over-engineering - keep it simple and maintainable
+
 ## Build & Deploy Process
 
-1. `npm run build` in frontend/ → produces `dist/`
-2. Go build embeds `frontend/dist/` using `//go:embed`
-3. Result: single binary that serves React app and API
+1. `make build` builds frontend and backend:
+   - `frontend-build`: Runs `npm run build` → produces `frontend/dist/`
+   - Copies `frontend/dist/` to `backend/internal/frontend/dist/`
+   - `backend-build`: Go build embeds `backend/internal/frontend/dist/` using `//go:embed`
+2. Result: single binary that serves React app and API
+
+**Important**:
+- **Do NOT commit build artifacts** (`backend/internal/frontend/dist/`) to git
+- Build artifacts are added to `.gitignore` to keep repo clean
+- Always run `make build` to generate fresh assets before deployment
+- This reduces git noise and keeps repository size minimal
 
 ## Status
 
