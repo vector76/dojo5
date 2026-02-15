@@ -12,6 +12,7 @@ import { ProfileEdit } from './pages/ProfileEdit'
 import { ClassTypes } from './pages/ClassTypes'
 import { Payments } from './pages/Payments'
 import { MyPayments } from './pages/MyPayments'
+import { Classes } from './pages/Classes'
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
             <Route path="members/new" element={<AddMember />} />
             <Route path="members/:id" element={<MemberDetail />} />
             <Route path="profile" element={<ProfileEdit />} />
+            <Route path="classes" element={<Classes />} />
             <Route path="class-types" element={<ClassTypes />} />
             <Route path="payments" element={<Payments />} />
             <Route path="my-payments" element={<MyPayments />} />
