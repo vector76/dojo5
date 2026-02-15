@@ -89,9 +89,9 @@ export function MyAttendance() {
           <tbody>
             {attendance.map(a => (
               <tr key={a.id}>
-                <td>{getClassTypeName(a.class_id)}</td>
-                <td>{getClassTime(a.class_id)}</td>
-                <td>{new Date(a.checked_in_at).toLocaleString()}</td>
+                <td data-label="Class">{getClassTypeName(a.class_id)}</td>
+                <td data-label="Class Date">{getClassTime(a.class_id)}</td>
+                <td data-label="Checked In">{new Date(a.checked_in_at).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>

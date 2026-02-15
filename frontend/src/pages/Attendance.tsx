@@ -187,8 +187,8 @@ export function Attendance() {
                 <tbody>
                   {attendance.map(a => (
                     <tr key={a.id}>
-                      <td>{getMemberName(a.user_id)}</td>
-                      <td>{new Date(a.checked_in_at).toLocaleString()}</td>
+                      <td data-label="Member">{getMemberName(a.user_id)}</td>
+                      <td data-label="Checked In At">{new Date(a.checked_in_at).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>

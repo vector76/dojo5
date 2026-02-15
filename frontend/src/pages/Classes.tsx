@@ -200,11 +200,13 @@ export function Classes() {
     <div>
       <h1>Class Schedule</h1>
 
-      <form onSubmit={handleFilter} aria-label="Filter classes">
-        <label htmlFor="from-date">From</label>
-        <input id="from-date" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-        <label htmlFor="to-date">To</label>
-        <input id="to-date" type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+      <form onSubmit={handleFilter} aria-label="Filter classes" className="filters">
+        <label htmlFor="from-date">From
+          <input id="from-date" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+        </label>
+        <label htmlFor="to-date">To
+          <input id="to-date" type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+        </label>
         <button type="submit">Filter</button>
         <button type="button" onClick={clearFilter}>Clear</button>
       </form>
@@ -263,13 +265,13 @@ export function Classes() {
         <tbody>
           {classes.map(cls => (
             <tr key={cls.id}>
-              <td>{formatDateTime(cls.start_time)}</td>
-              <td>{getClassTypeName(cls.class_type_id)}</td>
-              <td>{getInstructorName(cls.instructor_id)}</td>
-              <td>{cls.duration_minutes} min</td>
-              <td>{cls.capacity}</td>
+              <td data-label="Date/Time">{formatDateTime(cls.start_time)}</td>
+              <td data-label="Class Type">{getClassTypeName(cls.class_type_id)}</td>
+              <td data-label="Instructor">{getInstructorName(cls.instructor_id)}</td>
+              <td data-label="Duration">{cls.duration_minutes} min</td>
+              <td data-label="Capacity">{cls.capacity}</td>
               {isAdmin && (
-                <td>
+                <td data-label="Actions">
                   <button onClick={() => startEdit(cls)}>Edit</button>
                   <button onClick={() => handleDelete(cls.id)}>Delete</button>
                 </td>

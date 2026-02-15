@@ -1,8 +1,16 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 export function Layout() {
   const { user, logout } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const location = useLocation()
+
+  // Close sidebar on navigation (mobile)
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
 
   if (!user) return null
 
@@ -11,7 +19,17 @@ export function Layout() {
 
   return (
     <div className="layout">
-      <nav className="sidebar" role="navigation">
+      <button
+        className="menu-toggle"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+      >
+        {sidebarOpen ? '\u2715' : '\u2630'}
+      </button>
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+      <nav className={`sidebar${sidebarOpen ? ' open' : ''}`} role="navigation">
         <div className="sidebar-header">
           <h2>Dojo CRM</h2>
         </div>

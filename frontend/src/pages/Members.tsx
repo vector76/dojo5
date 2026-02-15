@@ -104,11 +104,11 @@ export function Members() {
         <tbody>
           {filtered.map(m => (
             <tr key={m.id}>
-              <td><Link to={`/members/${m.id}`}>{m.name}</Link></td>
-              <td>{m.email}</td>
-              <td>{m.phone}</td>
-              <td>{m.role}</td>
-              <td>{m.membership_status ?? '-'}</td>
+              <td data-label="Name"><Link to={`/members/${m.id}`}>{m.name}</Link></td>
+              <td data-label="Email">{m.email}</td>
+              <td data-label="Phone">{m.phone}</td>
+              <td data-label="Role">{m.role}</td>
+              <td data-label="Status">{m.membership_status ?? '-'}</td>
             </tr>
           ))}
           {filtered.length === 0 && (

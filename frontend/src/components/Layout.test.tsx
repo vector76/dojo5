@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '../auth'
 import { ProtectedRoute } from './ProtectedRoute'
@@ -97,5 +98,34 @@ describe('Layout', () => {
     await waitFor(() => {
       expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
     })
+  })
+
+  it('renders hamburger menu toggle button', async () => {
+    mockUser('admin')
+    renderLayout()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Open menu')).toBeInTheDocument()
+    })
+  })
+
+  it('toggles sidebar open class when hamburger is clicked', async () => {
+    const user = userEvent.setup()
+    mockUser('admin')
+    renderLayout()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Open menu')).toBeInTheDocument()
+    })
+
+    const nav = screen.getByRole('navigation')
+    expect(nav.className).not.toContain('open')
+
+    await user.click(screen.getByLabelText('Open menu'))
+    expect(nav.className).toContain('open')
+    expect(screen.getByLabelText('Close menu')).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Close menu'))
+    expect(nav.className).not.toContain('open')
   })
 })

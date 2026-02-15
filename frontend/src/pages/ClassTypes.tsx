@@ -137,9 +137,9 @@ export function ClassTypes() {
         <tbody>
           {classTypes.map(ct => (
             <tr key={ct.id}>
-              <td>{ct.name}</td>
-              <td>{ct.description ?? '-'}</td>
-              <td>
+              <td data-label="Name">{ct.name}</td>
+              <td data-label="Description">{ct.description ?? '-'}</td>
+              <td data-label="Actions">
                 <button onClick={() => startEdit(ct)}>Edit</button>
                 <button onClick={() => handleDelete(ct.id)}>Delete</button>
               </td>

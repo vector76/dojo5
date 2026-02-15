@@ -187,9 +187,9 @@ export function Payments() {
             <tbody>
               {payments.map(p => (
                 <tr key={p.id}>
-                  <td>{p.date}</td>
-                  <td>${p.amount.toFixed(2)}</td>
-                  <td>{p.note ?? '-'}</td>
+                  <td data-label="Date">{p.date}</td>
+                  <td data-label="Amount">${p.amount.toFixed(2)}</td>
+                  <td data-label="Note">{p.note ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
