@@ -9,6 +9,7 @@ import (
 
 	"dojo-crm/backend/internal/auth"
 	"dojo-crm/backend/internal/database"
+	"dojo-crm/backend/internal/frontend"
 	"dojo-crm/backend/internal/handlers"
 	"dojo-crm/backend/internal/models"
 )
@@ -56,6 +57,9 @@ func newMux(jwtSecret string, authHandler *handlers.AuthHandler, userHandler *ha
 	mux.Handle("POST /api/classes/{id}/attendance", chain(attendanceHandler.Record, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor")))
 	mux.Handle("GET /api/classes/{id}/attendance", chain(attendanceHandler.ListByClass, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor")))
 	mux.Handle("GET /api/users/{id}/attendance", chain(attendanceHandler.ListByUser, auth.AuthMiddleware(jwtSecret), auth.RequireRole("admin", "instructor", "user")))
+
+	// Frontend: serve embedded SPA for all non-API routes
+	mux.Handle("/", frontend.Handler())
 
 	return mux
 }
