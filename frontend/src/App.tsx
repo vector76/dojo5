@@ -5,6 +5,7 @@ import { Layout } from './components/Layout'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Setup } from './pages/Setup'
+import { Members } from './pages/Members'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/setup" element={<Setup />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
+            <Route path="members" element={<Members />} />
           </Route>
         </Routes>
       </AuthProvider>
